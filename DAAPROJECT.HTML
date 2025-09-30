@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recipe Finder with Gap Analysis & Substitutes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #fdf6e3 0%, #eaddca 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      transition: background-color 0.3s ease;
+    }
+    
+    .card {
+      background: #fdf6e3;
+      color: #3b0764;
+      border-radius: 1rem;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+    .card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    .substitute {
+      font-style: italic;
+      color: #6d28d9;
+    }
+    .ingredient-tag {
+      display: inline-block;
+      background-color: #7c3aed;
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      margin: 0.15rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.2s ease;
+    }
+    .ingredient-tag:hover {
+      background-color: #6d28d9;
+    }
+    .ingredient-tag.selected {
+      background-color: #5b21b6;
+    }
+    .loading-spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid #7c3aed;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+      margin: 2rem auto;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .recipe-image {
+      width: 120px;
+      height: 120px;
+      border-radius: 1rem;
+      object-fit: cover;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .dark-mode {
+      background: #2e1065;
+      color: #e0d7f7;
+    }
+    .dark-mode .card {
+      background: #3b0764;
+      color: #f3e8ff;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    }
+    .dark-mode .substitute {
+      color: #d8b4fe;
+    }
+    .dark-mode input,
+    .dark-mode button {
+      background-color: #5b21b6;
+      color: #f3e8ff;
+      border-color: #7c3aed;
+    }
+    .dark-mode input::placeholder {
+      color: #c4b5fd;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center p-6 transition-colors duration-300 w-full h-full">
+  <header class="mb-10 text-center">
+    <h1 class="text-5xl font-extrabold mb-2 drop-shadow-lg select-none text-purple-800">Recipe Finder</h1>
+    <p class="text-xl max-w-xl mx-auto drop-shadow-md select-none text-purple-700">Enter ingredients you have, find recipes, and get substitutes for missing items!</p>
+    <button id="darkModeToggle" aria-label="Toggle Dark Mode" class="mt-4 px-4 py-2 rounded-lg bg-purple-700 text-white hover:bg-purple-800 transition select-none">
+      Toggle Dark Mode
+    </button>
+  </header>
+
+  <main class="w-full h-full bg-white p-8 shadow-lg transition-colors duration-300">
+
+    <label for="ingredients" class="block mb-2 font-semibold text-gray-700 dark:text-gray-300">Enter your ingredients (click tags or type, comma separated):</label>
+    <div id="ingredientTags" class="mb-4 flex flex-wrap gap-2">
+      <!-- Ingredient tags will be dynamically inserted here -->
+    </div>
+    <input id="ingredients" type="text" placeholder="e.g. ENTER INGREDIENTS"
+      class="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-purple-400 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-purple-500" autocomplete="off" />
+
+    <button id="findBtn" class="w-full py-3 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 transition mb-8">
+      Find Recipes
+    </button>
+
+    <section id="results" aria-live="polite" aria-atomic="true">
+      <!-- Results will appear here -->
+    </section>
+
+  </main>
+
+  <footer class="mt-auto text-PURPLE-900 mt-12 mb-6 text-center font-semibold select-none dark:text-PURPLE-300">
+    &copy; 2025 DAA PROJECT
+  </footer>
+
+<script>
+  const recipes = [
+    {
+      name: "Chicken Curry",
+      ingredients: ["chicken", "chilli powder", "onion", "tomato", "garlic"],
+      image: "https://www.cubesnjuliennes.com/wp-content/uploads/2020/07/Instant-Pot-Chicken-Curry-Recipe.jpg"
+    },
+    {
+      name: "Idli",
+      ingredients: ["rice", "salt", "water", "lemon"],
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQsStjdUOkbFCwkmqN3-Ju-39trgmQyoyedpA&s"
+    },
+    {
+      name: "Lemon Rice",
+      ingredients: ["lemon", "rice", "salt", "chilli"],
+      image: "https://www.indianhealthyrecipes.com/wp-content/uploads/2022/02/lemon-rice-recipe-500x500.jpg"
+    },
+    {
+      name: "Pasta Alfredo",
+      ingredients: ["pasta", "cream", "parmesan", "garlic", "butter"],
+      image: "https://www.sharmispassions.com/wp-content/uploads/2015/12/alfredopasta5.jpg"
+    },
+    {
+      name: "Vegetable Stir Fry",
+      ingredients: ["broccoli", "carrot", "bell pepper", "soy sauce", "garlic", "ginger"],
+      image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80"
+    },
+    {
+      name: "Tomato Soup",
+      ingredients: ["tomato", "onion", "garlic", "cream", "basil"],
+      image: "https://www.indianhealthyrecipes.com/wp-content/uploads/2022/11/tomato-soup-recipe-480x270.jpg"
+    },
+    {
+      name: "Omelette",
+      ingredients: ["egg", "salt", "pepper", "onion", "tomato"],
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSTbnh5a6QOXaIR6FTPQ_XkvuwmZbwvTmuiqQ&s"
+    },
+    {
+      name: "Guacamole",
+      ingredients: ["avocado", "onion", "tomato", "lemon", "salt", "cilantro"],
+      image: "https://californiaavocado.com/wp-content/uploads/2020/07/Guacamole-Autentico-1.jpeg"
+    },
+    {
+      name: "Chocolate Cake",
+      ingredients: ["flour", "cocoa powder", "sugar", "egg", "butter", "milk"],
+      image: "https://images.unsplash.com/photo-1542827634-3f7a7a7a7a7a?auto=format&fit=crop&w=400&q=80"
+    },
+    {
+      name: "Caesar Salad",
+      ingredients: ["lettuce", "parmesan", "croutons", "chicken", "caesar dressing"],
+      image: "https://cdn.loveandlemons.com/wp-content/uploads/2024/12/caesar-salad.jpg"
+    },
+    {
+      name: "Pancakes",
+      ingredients: ["flour", "milk", "egg", "sugar", "butter", "baking powder"],
+      image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80"
+    },
+    {
+      name: "Masala Dosa",
+      ingredients: ["rice", "urad dal", "potato", "mustard seeds", "chilli", "curry leaves"],
+      image: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Rameshwaram_Cafe_Dosa.jpg/1200px-Rameshwaram_Cafe_Dosa.jpg"
+    },
+    {
+      name: "Butter Chicken",
+      ingredients: ["chicken", "butter", "cream", "tomato", "garam masala", "ginger", "garlic"],
+      image: "https://www.cubesnjuliennes.com/wp-content/uploads/2020/07/Instant-Pot-Chicken-Curry-Recipe.jpg"
+    },
+    {
+      name: "Greek Salad",
+      ingredients: ["cucumber", "tomato", "feta cheese", "olive oil", "olives", "onion"],
+      image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=400&q=80"
+    },
+    {
+      name: "Veg Biryani",
+      ingredients: ["rice", "carrot", "peas", "onion", "yogurt", "spices"],
+      image: "https://i.ytimg.com/vi/Do7ZdUodDdw/maxresdefault.jpg"
+    }
+  ];
+
+  const substitutes = {
+    "chilli powder": ["paprika", "cayenne pepper"],
+    "cream": ["coconut milk", "yogurt"],
+    "parmesan": ["pecorino", "grana padano"],
+    "butter": ["margarine", "olive oil"],
+    "garlic": ["garlic powder", "asafoetida"],
+    "onion": ["shallots", "leek"],
+    "tomato": ["tomato paste", "red bell pepper"],
+    "milk": ["almond milk", "soy milk"],
+    "egg": ["flaxseed meal", "chia seeds"],
+    "yogurt": ["sour cream", "buttermilk"],
+    "rice": ["quinoa", "couscous"],
+    "salt": ["soy sauce", "tamari"],
+    "sugar": ["honey", "maple syrup"],
+    "lemon": ["lime", "vinegar"],
+    "cilantro": ["parsley", "basil"],
+    "ginger": ["ground ginger", "galangal"],
+    "curry leaves": ["bay leaves", "lime zest"],
+    "caesar dressing": ["ranch dressing", "italian dressing"],
+    "spices": ["garam masala", "curry powder"]
+  };
+
+  function normalize(str) {
+    return str.trim().toLowerCase();
+  }
+
+  function findMatchingRecipes(userIngredients) {
+    const userSet = new Set(userIngredients.map(normalize).filter(i => i));
+    const results = [];
+
+    recipes.forEach(recipe => {
+      const recipeSet = new Set(recipe.ingredients.map(normalize));
+      const intersection = new Set([...userSet].filter(x => recipeSet.has(x)));
+      const matchCount = intersection.size;
+      const totalCount = recipeSet.size;
+      const matchPercent = (matchCount / totalCount) * 100;
+
+      if (matchCount > 0) {
+        const missingIngredients = [...recipeSet].filter(i => !userSet.has(i));
+        results.push({
+          name: recipe.name,
+          ingredients: recipe.ingredients,
+          matchCount,
+          totalCount,
+          matchPercent: matchPercent.toFixed(1),
+          missingIngredients,
+          image: recipe.image
+        });
+      }
+    });
+
+    results.sort((a, b) => b.matchPercent - a.matchPercent);
+    return results;
+  }
+
+  // *** UPDATED renderResults function ***
+  function renderResults(results) {
+    const container = document.getElementById("results");
+    container.innerHTML = "";
+
+    if (results.length === 0) {
+      container.innerHTML = `<p class="text-center text-purple-700 dark:text-purple-300 text-lg font-semibold">No matching recipes found. Try adding more ingredients.</p>`;
+      return;
+    }
+
+    // Collect all missing ingredients across all recipes for substitutes
+    const allMissingIngredients = new Set();
+
+    results.forEach(recipe => {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const missingList = recipe.missingIngredients.join(", ") || "None";
+      const userHas = recipe.ingredients.filter(i => !recipe.missingIngredients.includes(normalize(i))).join(", ");
+
+      // Add missing ingredients to the set
+      recipe.missingIngredients.forEach(i => allMissingIngredients.add(i));
+
+      card.innerHTML = `
+        <img src="${recipe.image}" alt="${recipe.name}" class="recipe-image" loading="lazy" />
+        <div class="flex flex-col flex-grow">
+          <h2 class="text-2xl font-bold mb-2">${recipe.name}</h2>
+          <p class="mb-2">Match: <span class="font-semibold">${recipe.matchPercent}%</span> (${recipe.matchCount} of ${recipe.totalCount} ingredients)</p>
+          <p class="mb-2"><strong>Ingredients you have:</strong> ${userHas}</p>
+          <p class="mb-2"><strong>Missing ingredients:</strong> ${missingList}</p>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    // Create separate substitutes section below all recipe cards
+    const substitutesSection = document.createElement("section");
+    substitutesSection.className = "mt-6 p-4 bg-purple-50 dark:bg-purple-900 rounded-lg";
+
+    if (allMissingIngredients.size > 0) {
+      let subsHtml = "<h3 class='text-xl font-semibold mb-3 text-WHITE-700 dark:text-WHITE-300'>Substitutes for Missing Ingredients:</h3><ul class='list-disc list-inside text-BEIGE-600 dark:text-WHITE-200'>";
+      allMissingIngredients.forEach(ingredient => {
+        const subs = substitutes[ingredient];
+        if (subs && subs.length > 0) {
+          subsHtml += `<li><strong>${ingredient}:</strong> <span class="substitute">${subs.join(", ")}</span></li>`;
+        } else {
+          subsHtml += `<li><strong>${ingredient}:</strong> No substitutes available</li>`;
+        }
+      });
+      subsHtml += "</ul>";
+      substitutesSection.innerHTML = subsHtml;
+    } else {
+      substitutesSection.innerHTML = `<p class="text-center text-purple-700 dark:text-purple-300">No substitutes needed — you have all ingredients!</p>`;
+    }
+
+    container.appendChild(substitutesSection);
+  }
+
+  // Render ingredient tags and manage selection
+  const allIngredients = Array.from(new Set(recipes.flatMap(r => r.ingredients))).sort();
+
+  const ingredientTagsContainer = document.getElementById("ingredientTags");
+  const input = document.getElementById("ingredients");
+
+  function createTag(name) {
+    const tag = document.createElement("span");
+    tag.textContent = name;
+    tag.className = "ingredient-tag";
+    tag.tabIndex = 0;
+    tag.setAttribute("role", "button");
+    tag.setAttribute("aria-pressed", "false");
+
+    tag.addEventListener("click", () => toggleTag(tag));
+    tag.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleTag(tag);
+      }
+    });
+
+    return tag;
+  }
+
+  function toggleTag(tag) {
+    tag.classList.toggle("selected");
+    tag.setAttribute("aria-pressed", tag.classList.contains("selected").toString());
+    updateInputFromTags();
+  }
+
+  function updateInputFromTags() {
+    const selected = Array.from(ingredientTagsContainer.querySelectorAll(".ingredient-tag.selected")).map(t => t.textContent);
+    input.value = selected.join(", ");
+  }
+
+  function updateTagsFromInput() {
+    const values = input.value.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+
+    ingredientTagsContainer.querySelectorAll(".ingredient-tag").forEach(tag => {
+      if (values.includes(tag.textContent.toLowerCase())) {
+        tag.classList.add("selected");
+        tag.setAttribute("aria-pressed", "true");
+      } else {
+        tag.classList.remove("selected");
+        tag.setAttribute("aria-pressed", "false");
+      }
+    });
+  }
+
+  allIngredients.forEach(name => {
+    ingredientTagsContainer.appendChild(createTag(name));
+  });
+
+  input.addEventListener("input", () => {
+    updateTagsFromInput();
+  });
+
+  document.getElementById("findBtn").addEventListener("click", () => {
+    const userIngredients = input.value.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    const results = findMatchingRecipes(userIngredients);
+    renderResults(results);
+  });
+
+  // Dark mode toggle
+  const darkModeToggle = document.getElementById("darkModeToggle");
+  darkModeToggle.addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+  });
+</script>
+
+</body>
+</html>
